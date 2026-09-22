@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Handoff — Blender to glTF to ingest API</title>
+<meta name="description" content="A Blender add-on that preflights a scene for the problems that break 3D assets downstream, exports glTF, and publishes it to an ingest API that survives retries, rate limits, and dropped acknowledgements.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="demo.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="logo" href="https://sugarsheriff.github.io/lookatme/#projects">← liam<span>.</span>hulsey</a>
+    <a class="navlink" href="https://github.com/SugarSheriff/blender-handoff" target="_blank" rel="noopener">Source on GitHub</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Blender add-on · glTF 2.0 · REST ingest</div>
+    <h1>Handoff</h1>
+    <p class="sub">A Blender add-on that checks a scene for the problems that break 3D assets once they leave the artist's machine, exports it as glTF, and publishes it to an ingest API. The client survives retries, rate limits, and dropped acknowledgements without creating duplicates.</p>
+    <div class="flow" aria-label="Pipeline: Blender scene, preflight, GLB export, self-check, ingest API">
+      <span>Blender scene</span><i></i><span>Preflight</span><i></i><span>GLB export</span><i></i><span>Self-check</span><i></i><span>Ingest API</span>
+    </div>
+  </div>
+</header>
+
+<section id="simulate">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-num">01 — Break it on purpose</span>
+      <h2>Publish simulation</h2>
+      <p class="lede">The panel on the left mirrors the add-on's sidebar in Blender. Toggle a problem, press Publish, and watch the trace. Every step, message, and retry rule matches what the real add-on and the mock server in the repo do.</p>
+    </div>
+
+    <div class="sim">
+      <div class="bpanel" aria-label="Blender sidebar mock-up">
+        <div class="bpanel-tab">Handoff</div>
+        <div class="bfield"><label>Asset name</label><span class="binput">plinth_orb</span></div>
+        <div class="bfield"><label>Export</label><span class="bseg"><b class="on">Selected</b><b>Visible</b></span></div>
+        <div class="bendpoint">⛓ https://ingest.example.com</div>
+
+        <fieldset>
+          <legend>Scene problems</legend>
+          <label class="tog"><input type="checkbox" data-fault="colorspace"> Normal map tagged sRGB</label>
+          <label class="tog"><input type="checkbox" data-fault="procedural"> Noise Texture in material</label>
+          <label class="tog"><input type="checkbox" data-fault="units"> FBX import in centimeters</label>
+          <label class="tog"><input type="checkbox" data-fault="missing"> Texture file missing</label>
+        </fieldset>
+        <fieldset>
+          <legend>Server problems</legend>
+          <label class="tog"><input type="checkbox" data-fault="s503"> 503 on the first two tries</label>
+          <label class="tog"><input type="checkbox" data-fault="s429"> Rate limited (429)</label>
+          <label class="tog"><input type="checkbox" data-fault="ackloss"> Response lost after create</label>
+          <label class="tog"><input type="checkbox" data-fault="draco"> Export uses Draco</label>
+        </fieldset>
+
+        <div class="bactions">
+          <button class="bbtn" id="btn-preflight" type="button">✓ Run Preflight</button>
+          <button class="bbtn primary" id="btn-publish" type="button">⇪ Publish</button>
+        </div>
+      </div>
+
+      <div class="trace">
+        <ol class="rail" id="rail">
+          <li data-stage="preflight">Preflight</li>
+          <li data-stage="export">Export</li>
+          <li data-stage="create">Reserve</li>
+          <li data-stage="upload">Upload</li>
+          <li data-stage="complete">Complete</li>
+          <li data-stage="process">Process</li>
+          <li data-stage="ready">Ready</li>
+        </ol>
+        <div class="console" id="console" role="log" aria-live="polite">
+          <div class="line dim">Toggle a problem, then press Publish.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="inspect">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-num">02 — Not a simulation</span>
+      <h2>Inspect a real .glb</h2>
+      <p class="lede">The same checks the add-on runs on its own output, and the mock server runs on every upload, ported to JavaScript. Drop in any <code>.glb</code>. It's parsed in your browser and never uploaded. The default model was generated from raw bytes by <code>tools/make_sample_glb.py</code>.</p>
+    </div>
+
+    <div class="inspect">
+      <div class="viewer" id="viewer">
+        <div class="viewer-hint" id="viewer-hint">Loading sample…</div>
+        <div class="viewer-bar">
+          <label class="btn-small">Choose .glb<input type="file" id="file-input" accept=".glb,model/gltf-binary" hidden></label>
+          <button class="btn-small" id="btn-sample" type="button">Reload sample</button>
+          <span class="drop-note">or drop a file here</span>
+        </div>
+      </div>
+      <div class="report" id="report"></div>
+    </div>
+  </div>
+</section>
+
+<section id="repo">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="section-num">03 — What's in the repo</span>
+      <h2>The real building blocks</h2>
+    </div>
+    <div class="cards">
+      <a class="card" href="https://github.com/SugarSheriff/blender-handoff/tree/main/handoff" target="_blank" rel="noopener">
+        <span class="card-tag">Python · bpy</span>
+        <h3>The add-on</h3>
+        <p>Sidebar panel, operators, and preferences. Uploads run on a worker thread, and a <code>bpy.app.timers</code> callback redraws the panel, so Blender never freezes. Respects Blender 4.2's <em>Allow Online Access</em> switch.</p>
+      </a>
+      <a class="card" href="https://github.com/SugarSheriff/blender-handoff/blob/main/handoff/core/preflight.py" target="_blank" rel="noopener">
+        <span class="card-tag">Python · no bpy</span>
+        <h3>Preflight rules</h3>
+        <p>Checks color space by texture role, unit mix-ups, shear, procedural nodes, UDIMs, and triangle budgets after modifiers. They run on a plain-data snapshot, so they're unit-tested without Blender.</p>
+      </a>
+      <a class="card" href="https://github.com/SugarSheriff/blender-handoff/blob/main/handoff/core/client.py" target="_blank" rel="noopener">
+        <span class="card-tag">Python · stdlib</span>
+        <h3>Ingest client</h3>
+        <p>Three-step presigned-style upload. Idempotency keys on every POST, exponential backoff with jitter, Retry-After honored, and the API token never forwarded to a different host.</p>
+      </a>
+      <a class="card" href="https://github.com/SugarSheriff/blender-handoff/blob/main/server/mock_ingest.py" target="_blank" rel="noopener">
+        <span class="card-tag">Python · http.server</span>
+        <h3>Mock ingest server</h3>
+        <p>A local API with fault injection (<code>--fail-first</code>, <code>--rate-limit</code>, <code>--lose-ack</code>). It verifies checksums and rejects bad GLBs during processing, just like the real thing.</p>
+      </a>
+      <a class="card" href="https://github.com/SugarSheriff/blender-handoff/blob/main/handoff/core/glb.py" target="_blank" rel="noopener">
+        <span class="card-tag">Python · binary parsing</span>
+        <h3>GLB inspector</h3>
+        <p>Parses GLB chunks and validates them against the spec. Counts triangles per rendered instance and computes world-space bounds by walking the node hierarchy's transforms.</p>
+      </a>
+      <a class="card" href="https://github.com/SugarSheriff/blender-handoff/blob/main/TROUBLESHOOTING.md" target="_blank" rel="noopener">
+        <span class="card-tag">Docs</span>
+        <h3>Troubleshooting guide</h3>
+        <p>Every finding code has an entry: what you see, why it matters downstream, how to fix it. The <strong>?</strong> button in Blender links straight to it, and a test fails if a code goes undocumented.</p>
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">Built by <a href="https://sugarsheriff.github.io/lookatme/">Liam Hulsey</a> · Blender add-on licensed GPL-3.0-or-later</div>
+</footer>
+
+<script src="sim.js"></script>
+<script type="module" src="viewer.js"></script>
+</body>
+</html>

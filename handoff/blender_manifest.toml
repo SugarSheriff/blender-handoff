@@ -1,0 +1,20 @@
+schema_version = "1.0.0"
+
+id = "handoff"
+version = "0.1.0"
+name = "Handoff"
+tagline = "Preflight a scene, export glTF, and publish it to an ingest API"
+maintainer = "Liam Hulsey (SugarSheriff)"
+type = "add-on"
+website = "https://github.com/SugarSheriff/blender-handoff"
+
+tags = ["Import-Export", "Pipeline"]
+
+blender_version_min = "4.2.0"
+
+# Blender add-ons import bpy, so they must be GPL-compatible.
+license = ["SPDX:GPL-3.0-or-later"]
+
+[permissions]
+network = "Upload exported glTF to the configured ingest endpoint"
+files = "Write the exported GLB to a temporary folder before upload"
